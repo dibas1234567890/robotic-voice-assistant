@@ -1,0 +1,80 @@
+{
+  "workbench.colorTheme": "Quiet Light",
+  "workbench.iconTheme": "minimal",
+  "editor.fontFamily": "Fira Code, JetBrains Mono, Consolas, monospace",
+  "editor.fontLigatures": true,
+  "editor.fontSize": 14,
+  "editor.lineHeight": 22,
+  "editor.cursorStyle": "line",
+  "editor.cursorBlinking": "phase",
+  "editor.cursorSmoothCaretAnimation": true,
+  "editor.renderWhitespace": "boundary",
+  "editor.minimap.enabled": false,
+  "editor.lineNumbers": "on",
+  "editor.renderLineHighlight": "gutter",
+  "workbench.activityBar.visible": false,
+  "workbench.statusBar.visible": false,
+  "breadcrumbs.enabled": false,
+  "window.commandCenter": false,
+  "workbench.editor.showTabs": true,
+  "workbench.editor.tabCloseButton": "off",
+  "workbench.startupEditor": "none",
+  "files.autoSave": "off",
+  "editor.formatOnSave": false,
+
+  // Optional: increase high contrast in the UI
+  "workbench.colorCustomizations": {
+    "editor.background": "#ffffff",
+    "editor.foreground": "#000000",
+    "editor.selectionBackground": "#d0d7e1",
+    "editor.lineHighlightBackground": "#f5f5f5",
+    "editorGutter.background": "#ffffff",
+    "editorLineNumber.activeForeground": "#ff6a00",
+    "editorLineNumber.foreground": "#999999",
+    "sideBar.background": "#f9f9f9",
+    "activityBar.background": "#eeeeee",
+    "statusBar.background": "#eeeeee",
+    "titleBar.activeBackground": "#eeeeee",
+    "panel.background": "#ffffff",
+    "scrollbarSlider.background": "#bbbbbb80",
+    "scrollbarSlider.hoverBackground": "#99999980",
+    "scrollbarSlider.activeBackground": "#66666680"
+  },
+
+  // Token customizations to enhance code contrast
+  "editor.tokenColorCustomizations": {
+    "textMateRules": [
+      {
+        "scope": "comment",
+        "settings": {
+          "foreground": "#888888",
+          "fontStyle": "italic"
+        }
+      },
+      {
+        "scope": "keyword",
+        "settings": {
+          "foreground": "#0033cc"
+        }
+      },
+      {
+        "scope": "string",
+        "settings": {
+          "foreground": "#008800"
+        }
+      },
+      {
+        "scope": "variable",
+        "settings": {
+          "foreground": "#000000"
+        }
+      },
+      {
+        "scope": "constant.numeric",
+        "settings": {
+          "foreground": "#aa00aa"
+        }
+      }
+    ]
+  }
+}
