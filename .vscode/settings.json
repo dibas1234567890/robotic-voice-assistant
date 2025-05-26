@@ -7,16 +7,15 @@
   "editor.lineHeight": 22,
   "editor.cursorStyle": "line",
   "editor.cursorBlinking": "phase",
-  "editor.cursorSmoothCaretAnimation": true,
+  "editor.cursorSmoothCaretAnimation": "on",
   "editor.renderWhitespace": "boundary",
   "editor.minimap.enabled": false,
   "editor.lineNumbers": "on",
   "editor.renderLineHighlight": "gutter",
-  "workbench.activityBar.visible": false,
   "workbench.statusBar.visible": false,
   "breadcrumbs.enabled": false,
   "window.commandCenter": false,
-  "workbench.editor.showTabs": true,
+  "workbench.editor.showTabs": "multiple",
   "workbench.editor.tabCloseButton": "off",
   "workbench.startupEditor": "none",
   "files.autoSave": "off",
@@ -76,5 +75,7 @@
         }
       }
     ]
-  }
+  },
+  "workbench.activityBar.location": "hidden",
+  "workbench.editor.tabActionCloseVisibility": false
 }
