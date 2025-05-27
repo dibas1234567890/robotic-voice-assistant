@@ -76,6 +76,6 @@
       }
     ]
   },
-  "workbench.activityBar.location": "hidden",
+  "workbench.activityBar.location": "default",
   "workbench.editor.tabActionCloseVisibility": false
 }

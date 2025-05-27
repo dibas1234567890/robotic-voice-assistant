@@ -4,7 +4,6 @@ import json
 import os 
 import queue
 import socket
-import subprocess
 import threading
 import time 
 import pyaudio
@@ -31,7 +30,7 @@ if not WS_URL:
 
 chunk_size = config.CHUNK_SIZE
 rate = config.RATE
-format = config.FORMAT
+format_ = config.FORMAT
 
 audio_buffer = bytearray()
 
@@ -57,34 +56,44 @@ def stop_audio_playback():
     print(Fore.GREEN + "Stopped Audio Feedback")
     print(Fore.BLACK)
 
-
-def mic_callback(in_data, frame_count, time_info, status): 
+def mic_callback(in_data, frame_count, time_info, status):
     global mic_on_at, mic_active
 
-    if mic_active != True: 
-       print(Fore.GREEN + "Mic Active")
-       pass
-
+    if mic_active != True:
+        print('🎙️🟢 Mic active')
+        mic_active = True
     mic_queue.put(in_data)
+
+    # if time.time() > mic_on_at:
+    #     if mic_active != True:
+    #         print('🎙️🟢 Mic active')
+    #         mic_active = True
+    #     mic_queue.put(in_data)
+    # else:
+    #     if mic_active != False:
+    #         print('🎙️🔴 Mic suppressed')
+    #         mic_active = False
 
     return (None, pyaudio.paContinue)
 
-def send_mic_audio_to_websocket(ws): 
-    try: 
+
+# Function to send microphone audio data to the WebSocket
+def send_mic_audio_to_websocket(ws):
+    try:
         while not stop_event.is_set():
             if not mic_queue.empty():
                 mic_chunk = mic_queue.get()
-                print(Fore.GREEN + "sending audio to mic")
-                encoded_chunk = base64.b64encode(mic_chunk).decode("utf-8") 
-                message = json.dumps({"type":"input_audio_buffer.append", "audio":encoded_chunk})
-                try: 
+                # print(f'🎤 Sending {len(mic_chunk)} bytes of audio data.')
+                encoded_chunk = base64.b64encode(mic_chunk).decode('utf-8')
+                message = json.dumps({'type': 'input_audio_buffer.append', 'audio': encoded_chunk})
+                try:
                     ws.send(message)
-                except Exception as e: 
-                    print(f"Couldn't send mic audio {e}")
-    except Exception as e: 
-        print(f"Exception in send_mic_audio_thread {e}")
-    finally: 
-        print("Mic thread audio is being exited")
+                except Exception as e:
+                    print(f'Error sending mic audio: {e}')
+    except Exception as e:
+        print(f'Exception in send_mic_audio_to_websocket thread: {e}')
+    finally:
+        print('Exiting send_mic_audio_to_websocket thread.')
 
 def speaker_callback(in_data, frame_count, time_info, status):
     global audio_buffer, mic_on_at
@@ -95,10 +104,12 @@ def speaker_callback(in_data, frame_count, time_info, status):
     if current_buffer_size >= bytes_needed: 
         audio_chunk = bytes(audio_buffer[:bytes_needed])
         audio_buffer = audio_buffer[bytes_needed:]
-        mic_on_at = time.time()
+        mic_on_at = time.time() +REENGAGE_DELAY_MS/1000
     else: 
-        audio_chunk = bytes(audio_buffer)
+        audio_chunk = bytes(audio_buffer) + b'\x00' * (bytes_needed-current_buffer_size)
         audio_buffer.clear()
+    return (audio_chunk, pyaudio.paContinue)
+
 
 def recieve_audio_from_websocket(ws):
     global audio_buffer
@@ -116,6 +127,7 @@ def recieve_audio_from_websocket(ws):
                 print(Fore.GREEN + f"recieved websocket response {event_type}")
                 if event_type == "session.created": 
                     send_fc_session_update(ws)
+                    
                 elif event_type == "response.audio.delta": 
                     audio_content = base64.b64decode(message['delta'])
                     audio_buffer.extend(audio_content)
@@ -131,6 +143,12 @@ def recieve_audio_from_websocket(ws):
                     print(Fore.BLACK)
                 elif event_type == "response.function_call_arguments.done":
                     handle_function_call(message, ws)
+                elif event_type == "error":
+                    error_detail = message.get("message", "No message")
+                    print(Fore.RED + f"WebSocket Error: {error_detail}")
+                    print(Fore.RED + f"Full Error Event: {json.dumps(message, indent=2)}")
+                    print(Fore.BLACK)
+                    stop_event.set()  # Optionally shut down everything
 
             except Exception as e: 
                 print(Fore.RED + "Error while receiving audio") 
@@ -166,7 +184,7 @@ def send_function_call_result(result, call_id, ws):
     result_json = {
         "type":"conversation.item.create", 
         "item":{
-            "type":"funciton_call_output", 
+            "type":"function_call_output", 
             "output" :  result,
             "call_id" : call_id
         }
@@ -228,6 +246,116 @@ def send_fc_session_update(ws):
                 "model": "whisper-1"
             },
             "tool_choice" : "auto", 
+            "tools" : [
+                {
+                    "type":"function", 
+                    "name" : "get_weather", 
+                    "description":"Get current weather for a specified city", 
+                    "parameters" : {
+                        "type":"object",
+                        "properties" : {
+                            "city" :{
+                                "type" :"string", 
+                                "description" : "The name of the city for which the weather is to be fetched"
+                            }, 
+                           
+
+                        },
+                         "required" : ["city"]
+                    }
+                }
+            ]
         }
     }
-    ws.send(json.dumps(session_config))
+    session_config_json = json.dumps(session_config)
+    print(f"Send FC session update: {session_config_json}")
+
+    try: 
+        ws.send(session_config_json)
+    except: 
+        print("Failed to send session update")
+
+
+def create_connection_with_ipv4(*args, **kwargs): 
+    original_getaddrinfo = socket.getaddrinfo
+    def getaddrinfo_ipv4(host, port, family=socket.AF_INET, *args): 
+        return original_getaddrinfo(host, port, socket.AF_INET, *args)
+    socket.getaddrinfo = getaddrinfo_ipv4
+
+    try: 
+        return websocket.create_connection(*args, **kwargs) 
+    finally: 
+        socket.getaddrinfo = original_getaddrinfo
+
+def connect_to_openai(): 
+    ws = None 
+    try: 
+        ws = create_connection_with_ipv4(WS_URL, header = [f"Authorization: Bearer {OPENAI_API_KEY}", 'OpenAI-Beta: realtime=v1'])
+        print(Fore.GREEN+"Connected to OpenAi socket")
+
+        receive_thread = threading.Thread(target=recieve_audio_from_websocket, args=(ws,))
+        receive_thread.start()
+        mic_thread = threading.Thread(target=send_mic_audio_to_websocket, args=(ws, ))
+        mic_thread.start()
+
+        while not stop_event.is_set():
+            time.sleep(0.1)
+
+        print(Fore.GREEN + "Sending websocket close frame")
+        print(Fore.BLACK)
+
+        ws.send_close() 
+        receive_thread.join()
+        mic_thread.join()
+
+        print(Fore.GREEN + "Websocket closed and threads terminated")
+    except Exception as e: 
+        print(Fore.RED + "Failed o connect to OpenAI")
+        print(Fore.BLACK)
+    finally: 
+        if ws is not None: 
+            try: 
+                ws.close()
+                print(Fore.GREEN+"Websocket connection closed")
+                print(Fore.BLACK)
+
+            except: 
+                print(Fore.RED+"Error closing connection")
+                print(Fore.BLACK)
+
+def main(): 
+    p = pyaudio.PyAudio()
+    mic_stream = p.open(format=config.FORMAT,
+                        channels=1, 
+                        rate=rate, 
+                        input=True, 
+                        stream_callback=mic_callback,
+                        frames_per_buffer=chunk_size)
+    speaker_stream = p.open(format=config.FORMAT,
+                        channels=1, 
+                        rate=rate, 
+                        output=True, 
+                        stream_callback=speaker_callback,
+                        frames_per_buffer=chunk_size)
+    try: 
+        mic_stream.start_stream()
+        speaker_stream.start_stream()
+        connect_to_openai()
+        while mic_stream.is_active() and speaker_stream.is_active():
+            time.sleep(0.1)
+    except KeyboardInterrupt: 
+        print(Fore.GREEN + "Gracefully shutting down")
+        print(Fore.BLACK)
+        stop_event.set()
+
+    finally: 
+        mic_stream.stop_stream()
+        mic_stream.close()
+        speaker_stream.stop_stream()
+        speaker_stream.close()
+        p.terminate()
+        print(Fore.GREEN, "Audio streams stopped and resources released. Exiting")
+        print(Fore.BLACK, "")
+
+if __name__ == "__main__": 
+    main()
