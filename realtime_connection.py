@@ -12,7 +12,7 @@ import websocket
 from colorama import Fore
 
 #custom importss
-from helper_functions import get_weather
+from tools.weather_tool import get_weather
 from realime_config import CustomRealtimeConfig
 
 config = CustomRealtimeConfig()
@@ -20,6 +20,8 @@ config = CustomRealtimeConfig()
 socket.socket = socks.socksocket
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+languages = "Arabic, English, French, Mexican, Hindi"
 
 if not OPENAI_API_KEY: 
     raise ValueError("API KEY MISSING")
@@ -89,7 +91,7 @@ def send_mic_audio_to_websocket(ws):
                 try:
                     ws.send(message)
                 except Exception as e:
-                    print(f'Error sending mic audio: {e}')
+                    print(Fore.RED + f'Error sending mic audio: {e}')
     except Exception as e:
         print(f'Exception in send_mic_audio_to_websocket thread: {e}')
     finally:
@@ -220,6 +222,7 @@ def send_fc_session_update(ws):
     - If the user asks about the weather, use the weather tool to fetch the current
       weather based on their location or the city they mention.
     - Respond clearly and concisely with the relevant weather information.
+   
     """
     session_config = {
         "type": "session.update", 
@@ -229,6 +232,8 @@ def send_fc_session_update(ws):
                 "If they ask about the weather, use the weather tool to look up the "
                 "current conditions based on their location or the city they mention. "
                 "Respond in a natural, conversational tone with the weather information."
+                f""" - You will be provided multiple tools make the tool selection dynamic as per the session configuration. 
+              Always respond with the language the user has replied to you in the latest message from these languages, only these languages {languages}"""
             ), 
             "turn_detection": {
                 "type" : "server_vad", 
@@ -323,7 +328,7 @@ def connect_to_openai():
                 print(Fore.RED+"Error closing connection")
                 print(Fore.BLACK)
 
-def main(): 
+def realtime_main_(): 
     p = pyaudio.PyAudio()
     mic_stream = p.open(format=config.FORMAT,
                         channels=1, 
@@ -358,4 +363,4 @@ def main():
         print(Fore.BLACK, "")
 
 if __name__ == "__main__": 
-    main()
+    realtime_main_()

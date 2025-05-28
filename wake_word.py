@@ -6,17 +6,15 @@ import speech_recognition as sr
 from playsound import playsound
 
 language = "en"
-r = sr.Recognizer() 
 engine = pyttsx3.init()
-name = "Dibas"
 # greetings = [f"whats up master {name}", "yeah?", "Well, hello there! How's it going today?",
 #              f"Ahoy there, Captain {name}! How's the ship sailing?", "How can I help?", "How's it going my man!"]
-greetings =[f"Hello {name}, how may I help you?"]
 tts_engine = 'gtts'
 messages = [{"role": "system", "content": "You are a helpful assistant. Keep answers under 100 words."}]
 
 
-def listen_for_wake_word(source, messages):
+def listen_for_wake_word(source, messages, name, r):
+    greetings =[f"Hello, welcome to ACCORD HOTELS, {name}, how may I help you?"]
     print("DEBUG: === Starting wake word detection ===")
     print("DEBUG: Listening for 'Hello'...")
     print("DEBUG: Wake word detection is case-insensitive")
@@ -33,7 +31,7 @@ def listen_for_wake_word(source, messages):
             print("DEBUG: Audio captured, attempting recognition...")
             text = r.recognize_google(audio)
             print(f"DEBUG: Recognition successful: '{text}'")
-            if "hello" in text.lower():
+            if "hello anita" in text.lower():
                 print("DEBUG: *** WAKE WORD DETECTED! ***")
                 greet_text = np.random.choice(greetings)
                 try:
@@ -46,7 +44,7 @@ def listen_for_wake_word(source, messages):
                         playsound('response.mp3')
                     print("DEBUG: Greeting complete, switching to conversation mode")
                     # listen_and_respond(source, messages)
-                    break
+                    return True
                 except Exception as e:
                     
                     print(f"DEBUG: Error during greeting: {e}")
@@ -67,6 +65,3 @@ def listen_for_wake_word(source, messages):
             continue
     print(f"DEBUG: Wake word detection stopped after {listen_attempts} attempts")
 
-with sr.Microphone(device_index=4) as source: 
-    r.adjust_for_ambient_noise(source=source)
-    listen_for_wake_word(source=source, messages=messages)
