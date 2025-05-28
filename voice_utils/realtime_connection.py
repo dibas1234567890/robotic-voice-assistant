@@ -13,7 +13,7 @@ from colorama import Fore
 
 #custom importss
 from tools.weather_tool import get_weather
-from realime_config import CustomRealtimeConfig
+from voice_utils.realime_config import CustomRealtimeConfig
 
 config = CustomRealtimeConfig()
 

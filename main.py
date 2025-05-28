@@ -1,6 +1,6 @@
 from colorama import Fore
-from wake_word import listen_for_wake_word
-from realtime_connection import realtime_main_
+from voice_utils.wake_word import listen_for_wake_word
+from voice_utils.realtime_connection import realtime_main_
 import speech_recognition as sr
 
 messages = [{"role": "system", "content": "You are a helpful assistant. Keep answers under 100 words."}]

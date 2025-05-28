@@ -19,6 +19,7 @@ class CustomChroma:
         global chroma_client
         chroma_client = await chromadb.AsyncHttpClient()
         return chroma_client
+    
 
     async def create_collection(self, filename:str, intent:str): 
         try: 
@@ -26,15 +27,19 @@ class CustomChroma:
             return collection
         except Exception as e:
             print(Fore.RED + f"Error in creating Chroma collection {e}")
+
     
     async def add_to_collection(self, collection_name:str, documents, filename:str): 
         try: 
             collection_ = await chroma_client.get_or_create_collection(name=collection_name)
-            for doc in docu
-            await collection_.add(documents=documents, metadata = {"filename":filename}, embeddings)
+            embeddings = []
+            for doc in documents: 
+                embeddings.append(openai_ef(doc.page_content))
+            await collection_.add(documents=documents, metadata = {"filename":filename}, embeddings=embeddings)
         except Exception as e:
             raise e
         
+
     async def delete_collection(collection_name:str, metadata:dict = {}): 
         try: 
 
