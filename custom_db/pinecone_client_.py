@@ -2,7 +2,9 @@ import os
 from pinecone import PineconeAsyncio, ServerlessSpec
 
 PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
-
+#TODO: make better import strcuruer
+import os 
+INDEX_NAME = os.getenv('INDEX_NAME')
 class PineconeCustom:
     def __init__(self, api_key: str = PINECONE_API_KEY):
         self.api_key = api_key
@@ -32,7 +34,7 @@ class PineconeCustom:
                 tags={"environment": "development"}
             )
 
-    async def connect_index(self, index_name: str):
+    async def connect_index(self, index_name: str=INDEX_NAME):
         self.index = self.pc.IndexAsyncio("https://default-index-vvouc9f.svc.aped-4627-b74a.pinecone.io")
 
     async def upsert_vectors(self, items, namespace: str = "default"):

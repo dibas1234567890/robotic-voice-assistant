@@ -54,7 +54,8 @@ REENGAGE_DELAY_MS = config.REENGAGE_DELAY_MS
 
 
 def run_async_function_in_thread(async_func, *args):
-    loop = asyncio.new_event_loop()
+    
+    loop = asyncio.get_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(async_func(*args))
 
@@ -127,7 +128,7 @@ def speaker_callback(in_data, frame_count, time_info, status):
     return (audio_chunk, pyaudio.paContinue)
 
 
-async def recieve_audio_from_websocket(ws):
+async def recieve_audio_from_websocket(ws, pinecone_client = None):
     global audio_buffer
 
     try: 
@@ -158,7 +159,7 @@ async def recieve_audio_from_websocket(ws):
                     print(Fore.GREEN + "AI is done speaking")
                     print(Fore.BLACK)
                 elif event_type == "response.function_call_arguments.done":
-                    await handle_function_call(message, ws)
+                    await handle_function_call(message, ws, pinecone_client)
                 elif event_type == "error":
                     error_detail = message.get("message", "No message")
                     print(Fore.RED + f"WebSocket Error: {error_detail}")
@@ -174,7 +175,7 @@ async def recieve_audio_from_websocket(ws):
         print(Fore.RED + f"Exception received in receive audio thread: {e}")
         print(Fore.BLACK)
 
-async def handle_function_call(event_json:dict, ws): 
+async def handle_function_call(event_json:dict, ws, pinecone_client): 
     try: 
         name = event_json.get("name", "")
         call_id = event_json.get("call_id", "")
@@ -193,7 +194,7 @@ async def handle_function_call(event_json:dict, ws):
             query = function_call_args.get("query","")
 
             if query: 
-                hotel_information_results = await general_hotel_information_tool(query=query)
+                hotel_information_results = await general_hotel_information_tool(query=query, pinecone_client=pinecone_client)
                 send_function_call_result(str(hotel_information_results), call_id, ws)
         if name == "hotel_service_tool":
             query = function_call_args.get("query","")
@@ -372,47 +373,43 @@ def create_connection_with_ipv4(*args, **kwargs):
     finally: 
         socket.getaddrinfo = original_getaddrinfo
 
-async def connect_to_openai(): 
+async def connect_to_openai(pinecone_client):
     ws = None 
-    try: 
-        ws = create_connection_with_ipv4(WS_URL, header = [f"Authorization: Bearer {OPENAI_API_KEY}", 'OpenAI-Beta: realtime=v1'])
-        print(Fore.GREEN+"Connected to OpenAi socket")
+    try:
+        ws = create_connection_with_ipv4(
+            WS_URL,
+            header=[f"Authorization: Bearer {OPENAI_API_KEY}", 'OpenAI-Beta: realtime=v1']
+        )
+        print(Fore.GREEN + "Connected to OpenAI socket")
 
-        receive_thread = receive_thread = threading.Thread(
-    target=run_async_function_in_thread,
-    args=(recieve_audio_from_websocket, ws)
-)
+        # Create async task for receiving audio (non-blocking)
+        receive_task = asyncio.create_task(recieve_audio_from_websocket(ws, pinecone_client))
 
-        receive_thread.start()
-        mic_thread = threading.Thread(target=send_mic_audio_to_websocket, args=(ws, ))
+        # Start blocking mic thread (ok to use thread for this)
+        mic_thread = threading.Thread(target=send_mic_audio_to_websocket, args=(ws,))
         mic_thread.start()
 
         while not stop_event.is_set():
-            time.sleep(0.1)
+            await asyncio.sleep(0.1)
 
         print(Fore.GREEN + "Sending websocket close frame")
-        print(Fore.BLACK)
+        ws.send_close()
 
-        ws.send_close() 
-        receive_thread.join()
+        await receive_task
         mic_thread.join()
 
         print(Fore.GREEN + "Websocket closed and threads terminated")
-    except Exception as e: 
-        print(Fore.RED + "Failed o connect to OpenAI")
-        print(Fore.BLACK)
-    finally: 
-        if ws is not None: 
-            try: 
+    except Exception as e:
+        print(Fore.RED + f"Failed to connect to OpenAI: {e}")
+    finally:
+        if ws is not None:
+            try:
                 ws.close()
-                print(Fore.GREEN+"Websocket connection closed")
-                print(Fore.BLACK)
+                print(Fore.GREEN + "Websocket connection closed")
+            except Exception:
+                print(Fore.RED + "Error closing connection")
 
-            except: 
-                print(Fore.RED+"Error closing connection")
-                print(Fore.BLACK)
-
-async def realtime_main_(): 
+async def realtime_main_(pinecone_client): 
     p = pyaudio.PyAudio()
     mic_stream = p.open(format=config.FORMAT,
                         channels=1, 
@@ -429,7 +426,7 @@ async def realtime_main_():
     try: 
         mic_stream.start_stream()
         speaker_stream.start_stream()
-        await connect_to_openai()
+        await connect_to_openai(pinecone_client)
         while mic_stream.is_active() and speaker_stream.is_active():
             time.sleep(0.1)
     except KeyboardInterrupt: 
@@ -446,5 +443,5 @@ async def realtime_main_():
         print(Fore.GREEN, "Audio streams stopped and resources released. Exiting")
         print(Fore.BLACK, "")
 
-if __name__ == "__main__": 
-    realtime_main_()
+# if __name__ == "__main__": 
+#     realtime_main_()
