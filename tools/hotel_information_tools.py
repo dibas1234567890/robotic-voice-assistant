@@ -4,8 +4,6 @@ import os
 INDEX = os.getenv("INDEX")
 pinecone_client = PineconeCustom()
 
-def service_related_queries_tool():
-    pass 
 
 async def general_hotel_information_tool(query:str, intent:str = "hotel_information"):
     """Takes in the query from the user only related to the hotel's information and then returns the similar answers using ChromaDB

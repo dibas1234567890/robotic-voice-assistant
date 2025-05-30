@@ -1,5 +1,6 @@
 from typing import List, TypedDict, Literal
 
+
 class ServiceRequest(TypedDict):
     service_request: Literal["front_desk", "room_service", "housekeeping", "maintenance", "admin", "help"]
     quantity: int
