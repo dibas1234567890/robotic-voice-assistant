@@ -1,30 +1,35 @@
 # built-in imports
 import os
 import shutil
-from fastapi import FastAPI, File, UploadFile
+from typing import Literal
+from fastapi import FastAPI, File, Form, UploadFile
 import uvicorn
 from contextlib import asynccontextmanager
 
 # custom imports
 from misc_utils.doc_loader import doc_loader_
 from misc_utils.unique_id_generator import unique_id_gen
-from custom_db import CustomChroma
+from custom_db.chroma_async_client import CustomChroma #can use async chroma if required
+from custom_db.pinecone_client_ import PineconeCustom
+from misc_utils.tuple_maker_ import prepare_upsert_tuples
 
 TEMP_STORAGE_PATH = os.getenv("TEMP_STORAGE_PATH", "/tmp")  
 
-chroma_client = CustomChroma()
+# chroma_client = CustomChroma()
+pinecone_client_async = PineconeCustom()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await chroma_client.initialize_async_chroma()
+    await pinecone_client_async.__aenter__()
     yield  
+    await pinecone_client_async.__aexit__()
 
 
 app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/doc-loader")
-async def load_docs(file: UploadFile = File(...), intent: str = "default_collection"):
+async def load_docs(file: UploadFile = File(...), intent: Literal["default_collection", "hotel_information", "local_information", "pricings"] = Form(...)):
     """Endpoint to upload and process PDF for RAG"""
     pdf_dir = ""
     try:
@@ -40,11 +45,11 @@ async def load_docs(file: UploadFile = File(...), intent: str = "default_collect
             shutil.copyfileobj(file.file, out)
 
         splits = await doc_loader_(pdf_path)
-        await chroma_client.add_to_collection(
-            collection_name=intent,
-            documents=splits,
-            filename=file.filename
-        )
+        embeddings = await pinecone_client_async.pc.inference.embed(model="llama-text-embed-v2", inputs =[split.page_content for split in splits], 
+                                                                    parameters ={"input_type": "passage", "truncate": "END"})
+        items = await prepare_upsert_tuples(splits=splits, embeddings=embeddings)
+        await pinecone_client_async.connect_index("default")
+        await pinecone_client_async.upsert_vectors(namespace=intent, items=items)
 
         return {"message": "Successfully uploaded and stored docs"}
 

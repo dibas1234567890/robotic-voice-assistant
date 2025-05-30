@@ -1,4 +1,4 @@
-from custom_db import CustomChroma
+from custom_db.chroma_async_client import CustomChroma
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 

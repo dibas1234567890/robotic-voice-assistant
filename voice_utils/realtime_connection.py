@@ -10,13 +10,19 @@ import pyaudio
 import socks
 import websocket
 from colorama import Fore
+import asyncio
 
 #custom importss
+from tools.hotel_information_tools import general_hotel_information_tool
+from tools.hotel_service_tools import hotel_service_tool
 from tools.weather_tool import get_weather
 from voice_utils.realime_config import CustomRealtimeConfig
 
+
 config = CustomRealtimeConfig()
 
+#TODO: make dynamic serviuces
+listed_services = ["front_desk", "room_service", "housekeeping", "maintenance", "admin", "help"]
 socket.socket = socks.socksocket
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -43,6 +49,14 @@ stop_event = threading.Event()
 mic_on_at = 0 
 mic_active = None
 REENGAGE_DELAY_MS = config.REENGAGE_DELAY_MS
+
+
+
+
+def run_async_function_in_thread(async_func, *args):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(async_func(*args))
 
 
 def clear_audio_buffer():
@@ -113,7 +127,7 @@ def speaker_callback(in_data, frame_count, time_info, status):
     return (audio_chunk, pyaudio.paContinue)
 
 
-def recieve_audio_from_websocket(ws):
+async def recieve_audio_from_websocket(ws):
     global audio_buffer
 
     try: 
@@ -144,7 +158,7 @@ def recieve_audio_from_websocket(ws):
                     print(Fore.GREEN + "AI is done speaking")
                     print(Fore.BLACK)
                 elif event_type == "response.function_call_arguments.done":
-                    handle_function_call(message, ws)
+                    await handle_function_call(message, ws)
                 elif event_type == "error":
                     error_detail = message.get("message", "No message")
                     print(Fore.RED + f"WebSocket Error: {error_detail}")
@@ -160,7 +174,7 @@ def recieve_audio_from_websocket(ws):
         print(Fore.RED + f"Exception received in receive audio thread: {e}")
         print(Fore.BLACK)
 
-def handle_function_call(event_json:dict, ws): 
+async def handle_function_call(event_json:dict, ws): 
     try: 
         name = event_json.get("name", "")
         call_id = event_json.get("call_id", "")
@@ -175,6 +189,29 @@ def handle_function_call(event_json:dict, ws):
             else: 
                 print(Fore.RED +"City name not provided")
                 print(Fore.BLACK)
+        if name == "general_hotel_information_tool": 
+            query = function_call_args.get("query","")
+
+            if query: 
+                hotel_information_results = await general_hotel_information_tool(query=query)
+                send_function_call_result(str(hotel_information_results), call_id, ws)
+        if name == "hotel_service_tool":
+            query = function_call_args.get("query","")
+            service_request = function_call_args.get("service_request", "")
+            quantity = function_call_args.get("quantity", '')
+
+            if query and service_request:
+                # You need to wrap the service_request, quantity, and query into a list of dicts
+                service_requests = [{
+                    "service_request": service_request,
+                    "quantity": quantity,
+                    "query": query
+                }]
+                
+                hotel_service_request_result = await hotel_service_tool(requests=service_requests)
+
+                send_function_call_result(str(hotel_service_request_result), call_id, ws)
+
 
     except Exception as e: 
         print()
@@ -216,6 +253,7 @@ def send_fc_session_update(ws):
 
     The message updates the session with new instructions tailored for a voice agent
     that can retrieve weather information using a tool.
+    Also, nthere are multiple tools like generalhotel information tool, entertainment tools, proceed accordingly
 
     Instructions:
     - Greet the user in a friendly way.
@@ -224,16 +262,18 @@ def send_fc_session_update(ws):
     - Respond clearly and concisely with the relevant weather information.
    
     """
+    hotels = "Accord Hotels"
     session_config = {
         "type": "session.update", 
         "session": {
             "instructions": (
-                "You are a helpful voice assistant. Greet the user cheerfully. "
+                f"You are a helpful voice assistant for {hotels}. Greet the user cheerfully. "
                 "If they ask about the weather, use the weather tool to look up the "
                 "current conditions based on their location or the city they mention. "
                 "Respond in a natural, conversational tone with the weather information."
-                f""" - You will be provided multiple tools make the tool selection dynamic as per the session configuration. 
-              Always respond with the language the user has replied to you in the latest message from these languages, only these languages {languages}"""
+                f""" - You will be provided multiple tools like general_hotel_information_tool, weather tool, etc make the tool selection dynamic as per the session configuration. 
+              Always respond with the language the user has replied to you in the latest message from these languages, 
+              only these languages {languages}, when the user asks general hotelinformation questions autmaitcally assume that it is for {hotels}"""
             ), 
             "turn_detection": {
                 "type" : "server_vad", 
@@ -268,7 +308,47 @@ def send_fc_session_update(ws):
                         },
                          "required" : ["city"]
                     }
+                }, {
+                    "type" : "function", 
+                    "name" : "general_hotel_information_tool", 
+                    "description" : "Use the piencone index for parsing through any queries related to hotel information like wifi password", 
+                    "parameters" : {
+                        "type" : "object", 
+                        "properties" : {
+                            "query" : {
+                                "type": "string", 
+                                "description" : "The query the user has asked for"
+                            }, 
+                         
+                        }, 
+                        "required" : ["query"]
+                    }
+                }, 
+               {
+                "type": "function",
+                "name": "hotel_service_tool",
+                "description": f"This tool takes any of the service listed here: {listed_services}",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                    "service_request": {
+                        "type": "string",
+                        "enum": listed_services,
+                        "description": "The type of request by the guest, from the list provided to you"
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "description": "The amount of the requested item or service for how many guests"
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "The user's query regarding the service request"
+                    }
+                    },
+                    "required": ["service_request", "query"]
                 }
+                }
+
             ]
         }
     }
@@ -292,13 +372,17 @@ def create_connection_with_ipv4(*args, **kwargs):
     finally: 
         socket.getaddrinfo = original_getaddrinfo
 
-def connect_to_openai(): 
+async def connect_to_openai(): 
     ws = None 
     try: 
         ws = create_connection_with_ipv4(WS_URL, header = [f"Authorization: Bearer {OPENAI_API_KEY}", 'OpenAI-Beta: realtime=v1'])
         print(Fore.GREEN+"Connected to OpenAi socket")
 
-        receive_thread = threading.Thread(target=recieve_audio_from_websocket, args=(ws,))
+        receive_thread = receive_thread = threading.Thread(
+    target=run_async_function_in_thread,
+    args=(recieve_audio_from_websocket, ws)
+)
+
         receive_thread.start()
         mic_thread = threading.Thread(target=send_mic_audio_to_websocket, args=(ws, ))
         mic_thread.start()
@@ -328,7 +412,7 @@ def connect_to_openai():
                 print(Fore.RED+"Error closing connection")
                 print(Fore.BLACK)
 
-def realtime_main_(): 
+async def realtime_main_(): 
     p = pyaudio.PyAudio()
     mic_stream = p.open(format=config.FORMAT,
                         channels=1, 
@@ -345,7 +429,7 @@ def realtime_main_():
     try: 
         mic_stream.start_stream()
         speaker_stream.start_stream()
-        connect_to_openai()
+        await connect_to_openai()
         while mic_stream.is_active() and speaker_stream.is_active():
             time.sleep(0.1)
     except KeyboardInterrupt: 

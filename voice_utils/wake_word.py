@@ -5,16 +5,17 @@ import pyttsx3
 import speech_recognition as sr
 from playsound import playsound
 
+
 language = "en"
 engine = pyttsx3.init()
-# greetings = [f"whats up master {name}", "yeah?", "Well, hello there! How's it going today?",
-#              f"Ahoy there, Captain {name}! How's the ship sailing?", "How can I help?", "How's it going my man!"]
+greetings = [f"whats up", "yeah?", "Well, hello there! How's it going today?",
+             f"Ahoy there, Captain ! How's the ship sailing?", "How can I help?", "How's it going my man!"]
 tts_engine = 'gtts'
 messages = [{"role": "system", "content": "You are a helpful assistant. Keep answers under 100 words."}]
 
 
 def listen_for_wake_word(source, messages, name, r):
-    greetings =[f"Hello, welcome to ACCORD HOTELS, {name}, how may I help you?"]
+    # greetings =[f"Hello, welcome to ACCORD HOTELS, {name}, how may I help you?"]
     print("DEBUG: === Starting wake word detection ===")
     print("DEBUG: Listening for 'Hello'...")
     print("DEBUG: Wake word detection is case-insensitive")
@@ -40,8 +41,8 @@ def listen_for_wake_word(source, messages, name, r):
                         engine.runAndWait()
                     elif tts_engine == 'gtts':
                         tts = gTTS(text=greet_text, lang=language)
-                        tts.save('response.mp3')
-                        playsound('response.mp3')
+                        tts.save('./sounds/response.mp3')
+                        playsound('./sounds/response.mp3')
                     print("DEBUG: Greeting complete, switching to conversation mode")
                     # listen_and_respond(source, messages)
                     return True
@@ -54,6 +55,7 @@ def listen_for_wake_word(source, messages, name, r):
             print("DEBUG: Listen timeout - no speech detected")
             continue
         except sr.UnknownValueError:
+            time.sleep(1)
             print("DEBUG: Audio captured but not understood")
             continue
         except sr.RequestError as e:
