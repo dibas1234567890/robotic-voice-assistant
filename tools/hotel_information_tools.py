@@ -1,6 +1,6 @@
+from langchain_core.tools import tool
 
-
-
+@tool
 async def general_hotel_information_tool(pinecone_client, query:str, intent:str = "hotel_information", ):
     """Takes in the query from the user only related to the hotel's information and then returns the similar answers using ChromaDB
     (Args)

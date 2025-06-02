@@ -5,6 +5,7 @@ from typing import Literal
 from fastapi import FastAPI, File, Form, UploadFile
 import uvicorn
 from contextlib import asynccontextmanager
+from pydantic import BaseModel
 
 # custom imports
 from misc_utils.doc_loader import doc_loader_
@@ -12,6 +13,8 @@ from misc_utils.unique_id_generator import unique_id_gen
 from custom_db.chroma_async_client import CustomChroma #can use async chroma if required
 from custom_db.pinecone_client_ import PineconeCustom
 from misc_utils.tuple_maker_ import prepare_upsert_tuples
+from llm_utils.agents import agent_executor
+from schema.ChatRequest import ChatRequest
 
 TEMP_STORAGE_PATH = os.getenv("TEMP_STORAGE_PATH", "/tmp")  
 
@@ -59,6 +62,19 @@ async def load_docs(file: UploadFile = File(...), intent: Literal["default_colle
     finally:
         if pdf_dir and os.path.exists(pdf_dir):
             shutil.rmtree(pdf_dir)
+
+
+@app.post("/chat-bot")
+async def chat(payload:ChatRequest):
+    """Endpoint to handles general queries"""
+    try:
+
+        data ={"query":payload.question, "sender_id":payload.session_id}
+        
+        response = await agent_executor.ainvoke(data)
+        return{"response":response}
+    except Exception as e:
+        return{"error": str(e)}
 
 
 
