@@ -13,7 +13,7 @@ from misc_utils.unique_id_generator import unique_id_gen
 from custom_db.chroma_async_client import CustomChroma #can use async chroma if required
 from custom_db.pinecone_client_ import PineconeCustom
 from misc_utils.tuple_maker_ import prepare_upsert_tuples
-from llm_utils.agents import agent_executor
+from llm_utils.agents_ import agent_executor
 from schema.ChatRequest import ChatRequest
 
 TEMP_STORAGE_PATH = os.getenv("TEMP_STORAGE_PATH", "/tmp")  
@@ -66,7 +66,14 @@ async def load_docs(file: UploadFile = File(...), intent: Literal["default_colle
 
 @app.post("/chat-bot")
 async def chat(payload:ChatRequest):
-    """Endpoint to handles general queries"""
+    """Endpoint to handle general queries.
+    
+    Parameters:
+    payloaad(ChatRequst): Request body containing the user's question and session ID
+
+    Returns:
+    dict: Contains the response from the agent or an error message.  
+    """
     try:
 
         data ={"query":payload.question, "sender_id":payload.session_id}
@@ -80,4 +87,4 @@ async def chat(payload:ChatRequest):
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
