@@ -6,6 +6,7 @@ from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 import chromadb
 import uuid
 
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai_ef = OpenAIEmbeddingFunction(api_key=OPENAI_API_KEY)
 
