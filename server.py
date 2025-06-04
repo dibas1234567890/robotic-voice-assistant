@@ -69,7 +69,7 @@ async def chat(payload:ChatRequest):
     """Endpoint to handle general queries.
     
     Parameters:
-    payloaad(ChatRequst): Request body containing the user's question and session ID
+    payload(ChatRequst): Request body containing the user's question and session ID
 
     Returns:
     dict: Contains the response from the agent or an error message.  

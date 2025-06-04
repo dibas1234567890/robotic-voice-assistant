@@ -4,7 +4,7 @@ from langchain_core.prompts import(SystemMessagePromptTemplate, HumanMessageProm
 #custom imports
 from prompts.system_prompt import system_prompt
 
-def template_():
+def template_()-> ChatPromptTemplate:
     """Creates a chat prompt template with a system and a human message.
 
     Returns:
